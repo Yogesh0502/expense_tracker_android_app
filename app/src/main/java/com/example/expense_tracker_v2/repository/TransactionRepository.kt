@@ -19,7 +19,7 @@ class TransactionRepository(private val dao: TransactionDao, private val categor
     suspend fun update(transaction: TransactionEntity) = dao.updateTransaction(transaction)
     suspend fun delete(transaction: TransactionEntity) = dao.deleteTransaction(transaction)
     suspend fun addCategory(name: String) = categoryDao.insert(UserCategoryEntity(name))
-    suspend fun deleteCategory(name: String): Boolean { if (dao.categoryUseCount(name) > 0) return false; categoryDao.delete(UserCategoryEntity(name)); return true }
+    suspend fun deleteCategory(name: String): Boolean = categoryDao.deleteIfUnused(name) > 0
     suspend fun addAccount(name: String) = accountDao.insert(PaymentAccountEntity(name))
-    suspend fun deleteAccount(name: String): Boolean { if (dao.accountUseCount(name) > 0) return false; accountDao.delete(PaymentAccountEntity(name)); return true }
+    suspend fun deleteAccount(name: String): Boolean = accountDao.deleteIfUnused(name) > 0
 }

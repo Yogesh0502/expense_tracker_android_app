@@ -24,6 +24,8 @@ interface TransactionDao {
 
 @Dao
 interface UserCategoryDao {
+    @Query("DELETE FROM custom_categories WHERE name = :name AND NOT EXISTS (SELECT 1 FROM transactions WHERE category = :name)")
+    suspend fun deleteIfUnused(name: String): Int
     @Query("SELECT * FROM custom_categories ORDER BY name") fun getAll(): Flow<List<UserCategoryEntity>>
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insert(category: UserCategoryEntity)
     @Delete suspend fun delete(category: UserCategoryEntity)
@@ -31,6 +33,8 @@ interface UserCategoryDao {
 
 @Dao
 interface PaymentAccountDao {
+    @Query("DELETE FROM payment_accounts WHERE name = :name AND NOT EXISTS (SELECT 1 FROM transactions WHERE paymentAccount = :name)")
+    suspend fun deleteIfUnused(name: String): Int
     @Query("SELECT * FROM payment_accounts ORDER BY name") fun getAll(): Flow<List<PaymentAccountEntity>>
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insert(account: PaymentAccountEntity)
     @Delete suspend fun delete(account: PaymentAccountEntity)
