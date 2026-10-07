@@ -7,14 +7,20 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [TransactionEntity::class, UserCategoryEntity::class, PaymentAccountEntity::class, CategoryOption::class], version = 4, exportSchema = false)
+@Database(entities = [TransactionEntity::class, UserCategoryEntity::class, PaymentAccountEntity::class, CategoryOption::class, MonthlyBudget::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun userCategoryDao(): UserCategoryDao
     abstract fun paymentAccountDao(): PaymentAccountDao
     abstract fun categoryOptionDao(): CategoryOptionDao
+    abstract fun analysisDao(): AnalysisDao
     companion object {
         @Volatile private var instance: AppDatabase? = null
+        private val migration4To5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS monthly_budgets (month TEXT NOT NULL, amount REAL NOT NULL, PRIMARY KEY(month))")
+            }
+        }
         private fun seedTypedOptions(db: SupportSQLiteDatabase) {
             fun add(type: String, parent: String, name: String) {
                 db.execSQL("INSERT OR IGNORE INTO category_options(type,parent,name) VALUES (?,?,?)", arrayOf(type,parent,name))
@@ -58,10 +64,11 @@ abstract class AppDatabase : RoomDatabase() {
         }
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "expense_tracker.db")
-                .addMigrations(migration1To2, migration2To3, migration3To4)
+                .addMigrations(migration1To2, migration2To3, migration3To4, migration4To5)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) { seedOptions(db); seedTypedOptions(db) }
                 }).build().also { instance = it }
         }
+        fun migrations(): Array<Migration> = arrayOf(migration1To2, migration2To3, migration3To4, migration4To5)
     }
 }

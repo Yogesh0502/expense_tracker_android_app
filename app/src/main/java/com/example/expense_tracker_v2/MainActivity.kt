@@ -28,6 +28,7 @@ import com.example.expense_tracker_v2.data.local.TransactionEntity
 import com.example.expense_tracker_v2.data.local.TransactionOptions
 import com.example.expense_tracker_v2.data.local.CategoryOption
 import com.example.expense_tracker_v2.viewmodel.TransactionViewModel
+import com.example.expense_tracker_v2.viewmodel.AnalysisViewModel
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.YearMonth
@@ -108,13 +109,15 @@ private val monthFormat = DateTimeFormatter.ofPattern("MMMM yyyy")
 @Composable
 private fun ExpenseTrackerApp(vm: TransactionViewModel = viewModel()) {
     val nav = rememberNavController()
+    val analysisVm: AnalysisViewModel = viewModel()
     val options by vm.categoryOptions.collectAsStateWithLifecycle()
     val accounts by vm.paymentAccounts.collectAsStateWithLifecycle()
     val transactions by vm.allTransactions.collectAsStateWithLifecycle()
     val back: () -> Unit = { nav.popBackStack(); Unit }
     NavHost(nav, startDestination = "dashboard") {
         composable("dashboard") {
-            Dashboard(vm, { nav.navigate("add") }, { nav.navigate("history") }, { nav.navigate("settings") })
+            Dashboard(vm, analysisVm, { nav.navigate("add") }, { nav.navigate("history") },
+                { nav.navigate("settings") }, { nav.navigate("analysis") })
         }
         composable("add") {
             TransactionForm(vm, null, options, accounts.map { it.name }) {
@@ -131,6 +134,9 @@ private fun ExpenseTrackerApp(vm: TransactionViewModel = viewModel()) {
         }
         composable("settings") {
             Settings(vm, back, { nav.navigate("categories") }, { nav.navigate("accounts") })
+        }
+        composable("analysis") {
+            AnalysisScreen(analysisVm, back, { nav.navigate("add") })
         }
         composable("categories") {
             ManageCategories(vm, options, back)
@@ -156,8 +162,11 @@ private fun Page(title: String, back: () -> Unit, content: androidx.compose.foun
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Dashboard(vm: TransactionViewModel, add: () -> Unit, history: () -> Unit, settings: () -> Unit) {
+private fun Dashboard(vm: TransactionViewModel, analysisVm: AnalysisViewModel, add: () -> Unit,
+                      history: () -> Unit, settings: () -> Unit, analysis: () -> Unit) {
     val state by vm.dashboard.collectAsStateWithLifecycle()
+    val breakdown by analysisVm.state.collectAsStateWithLifecycle()
+    LaunchedEffect(state.month) { analysisVm.selectMonth(state.month) }
     Scaffold(topBar = { TopAppBar(title = { Text("Expense Tracker") },
         actions = { TextButton(onClick = settings) { Text("Settings") } }) },
         floatingActionButton = { FloatingActionButton(onClick = add) { Text("+") } }) { padding ->
@@ -178,6 +187,19 @@ private fun Dashboard(vm: TransactionViewModel, add: () -> Unit, history: () -> 
             }
             item { Summary("Balance", state.income - state.expense, MaterialTheme.colorScheme.primary, Modifier.fillMaxWidth()) }
             item { Text("Transfers: " + currency(state.transfer), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item { TextButton(onClick = analysis) { Text("Analysis") } }
+            if (breakdown.month == state.month && !breakdown.loading && breakdown.error == null) {
+                item { BudgetCard(breakdown, analysisVm) }
+                item { Text("Expense Breakdown", style = MaterialTheme.typography.titleLarge) }
+                if (breakdown.categories.isEmpty()) item { Text("No expenses for this month.") }
+                items(breakdown.categories, key = { "breakdown-" + it.label }) { group ->
+                    Row(Modifier.fillMaxWidth()) {
+                        Text(group.label, Modifier.weight(1f))
+                        Text(currency(group.amount))
+                    }
+                }
+                item { InsightsCard(breakdown) }
+            }
             item {
                 Text("Recent Transactions", style = MaterialTheme.typography.titleLarge)
                 TextButton(onClick = history) { Text("All Transactions") }

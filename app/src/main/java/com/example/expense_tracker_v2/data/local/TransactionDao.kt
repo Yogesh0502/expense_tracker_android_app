@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TransactionDao {
+    @Query("SELECT * FROM transactions WHERE date >= :startDate AND date <= :endDate ORDER BY date DESC, createdAt DESC LIMIT 10")
+    fun getRecentTransactionsForMonth(startDate: String, endDate: String): Flow<List<TransactionEntity>>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertTransaction(transaction: TransactionEntity)
     @Update suspend fun updateTransaction(transaction: TransactionEntity)
     @Delete suspend fun deleteTransaction(transaction: TransactionEntity)

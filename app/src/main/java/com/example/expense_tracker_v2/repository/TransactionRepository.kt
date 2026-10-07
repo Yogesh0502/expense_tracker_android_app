@@ -10,6 +10,7 @@ import com.example.expense_tracker_v2.data.local.PaymentAccountEntity
 class TransactionRepository(private val dao: TransactionDao, private val categoryDao: UserCategoryDao, private val accountDao: PaymentAccountDao) {
     fun allTransactions() = dao.getAllTransactions()
     fun transactionsForMonth(start: String, end: String) = dao.getTransactionsForMonth(start, end)
+    fun recentTransactionsForMonth(start: String, end: String) = dao.getRecentTransactionsForMonth(start, end)
     fun monthlyIncome(start: String, end: String) = dao.getMonthlyIncome(start, end)
     fun monthlyExpense(start: String, end: String) = dao.getMonthlyExpense(start, end)
     fun monthlyTransfer(start: String, end: String) = dao.getMonthlyTransfer(start, end)

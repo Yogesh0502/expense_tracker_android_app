@@ -44,7 +44,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     @OptIn(ExperimentalCoroutinesApi::class)
     val dashboard = selectedMonth.flatMapLatest { month ->
         val (start, end) = bounds(month)
-        combine(repository.transactionsForMonth(start, end), repository.monthlyIncome(start, end), repository.monthlyExpense(start, end), repository.monthlyTransfer(start, end)) { transactions, income, expense, transfer -> DashboardState(month, transactions, income ?: 0.0, expense ?: 0.0, transfer ?: 0.0) }
+        combine(repository.recentTransactionsForMonth(start, end), repository.monthlyIncome(start, end), repository.monthlyExpense(start, end), repository.monthlyTransfer(start, end)) { transactions, income, expense, transfer -> DashboardState(month, transactions, income ?: 0.0, expense ?: 0.0, transfer ?: 0.0) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState(YearMonth.now()))
     val allTransactions = repository.allTransactions().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val customCategories = repository.customCategories().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
