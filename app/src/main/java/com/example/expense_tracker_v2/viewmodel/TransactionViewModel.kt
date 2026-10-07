@@ -17,6 +17,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import android.net.Uri
+import androidx.core.content.FileProvider
+import com.example.expense_tracker_v2.TransactionCsv
+import java.io.File
+import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import com.example.expense_tracker_v2.data.local.CategoryOption
 import java.time.LocalDate
 import java.time.YearMonth
@@ -69,18 +74,37 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 val stream = getApplication<Application>().contentResolver.openOutputStream(uri, "wt")
                     ?: error("Unable to open document")
                 stream.bufferedWriter(Charsets.UTF_8).use { writer ->
-                    writer.write("\uFEFFDate,Description,Amount,Type,Category,Subcategory,For,Payment Account,Merchant,Need/Want,Recurring\r\n")
-                    transactions.forEach { t ->
-                        val fields = listOf(t.date, t.description, t.amount.toString(), t.type, t.category,
-                            t.subcategory.orEmpty(), t.forPerson.orEmpty(), t.paymentAccount.orEmpty(),
-                            t.merchant.orEmpty(), t.needWant.orEmpty(), t.recurring.toString())
-                        writer.write(fields.joinToString(",") { value -> "\"" + value.replace("\"", "\"\"") + "\"" })
-                        writer.write("\r\n")
-                    }
+                    TransactionCsv.write(writer, transactions)
                 }
             }
             result(null)
         } catch (e: Exception) { result("CSV export failed. Please choose a writable location and try again.") }
+    }
+    fun prepareCsvShare(result: (Uri?, String?) -> Unit) = viewModelScope.launch {
+        try {
+            val uri = withContext(Dispatchers.IO) {
+                val app = getApplication<Application>()
+                val directory = File(app.cacheDir, "csv_shares")
+                check(directory.isDirectory || directory.mkdirs()) { "Unable to create cache directory" }
+                // Retain recent attachments so delayed receivers can still open them.
+                val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+                directory.listFiles()?.filter { it.isDirectory && it.lastModified() < cutoff }?.forEach { it.deleteRecursively() }
+                val session = File(directory, UUID.randomUUID().toString())
+                check(session.mkdirs())
+                val file = File(session, "ExpenseTracker_${LocalDate.now()}.csv")
+                try {
+                    file.bufferedWriter(Charsets.UTF_8).use { writer ->
+                        TransactionCsv.write(writer, repository.allTransactions().first())
+                    }
+                    FileProvider.getUriForFile(app, app.packageName + ".csvfiles", file)
+                } catch (e: Exception) {
+                    session.deleteRecursively()
+                    throw e
+                }
+            }
+            result(uri, null)
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { result(null, "Could not create CSV for sharing. Please try again.") }
     }
     fun addCategory(name: String) = viewModelScope.launch { repository.addCategory(name.trim()) }
     fun deleteCategory(name: String, result: (Boolean) -> Unit) = viewModelScope.launch { result(repository.deleteCategory(name)) }

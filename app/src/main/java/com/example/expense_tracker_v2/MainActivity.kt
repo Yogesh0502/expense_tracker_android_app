@@ -1,6 +1,8 @@
 package com.example.expense_tracker_v2
 
 import android.app.DatePickerDialog
+import android.content.Intent
+import android.content.ClipData
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -356,6 +358,7 @@ private fun History(transactions: List<TransactionEntity>, categories: List<Stri
 
 @Composable
 private fun Settings(vm: TransactionViewModel, back: () -> Unit, categories: () -> Unit, accounts: () -> Unit) {
+    val context = LocalContext.current
     var message by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
@@ -369,6 +372,29 @@ private fun Settings(vm: TransactionViewModel, back: () -> Unit, categories: () 
         item { OutlinedButton(onClick = accounts, modifier = Modifier.fillMaxWidth()) { Text("Manage Payment Accounts") } }
         item { Button(onClick = { export.launch("expenses-${LocalDate.now()}.csv") }, enabled = !busy,
             modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Exporting..." else "Export CSV") } }
+        item { OutlinedButton(onClick = {
+            busy = true
+            message = ""
+            vm.prepareCsvShare { uri, error ->
+                busy = false
+                if (uri == null) message = error ?: "Could not create CSV."
+                else try {
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/csv"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_SUBJECT, "Expense Tracker CSV Export")
+                        putExtra(Intent.EXTRA_TEXT, "Expense Tracker transactions exported on ${LocalDate.now()}.")
+                        clipData = ClipData.newUri(context.contentResolver, "Expense Tracker CSV", uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(send, "Share expense data").apply {
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    })
+                } catch (e: Exception) {
+                    message = "Unable to open the share sheet. Please try again."
+                }
+            }
+        }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Share CSV") } }
         if (message.isNotEmpty()) item { Text(message) }
         item { Text("About", style = MaterialTheme.typography.titleLarge); Text("Expense Tracker\nYour personal offline expense tracker. Recurring is a label only; it does not create transactions automatically.") }
     }
